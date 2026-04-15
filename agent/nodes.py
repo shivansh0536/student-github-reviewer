@@ -18,30 +18,35 @@ def extract_github_data(state: ReviewState):
     try:
         user_url = f"https://api.github.com/users/{username}"
         user_resp = requests.get(user_url, headers=headers)
+        user_resp.raise_for_status()
 
         repos_url = f"https://api.github.com/users/{username}/repos?sort=updated&per_page=5"
         repos_resp = requests.get(repos_url, headers=headers)
+        repos_resp.raise_for_status()
 
-        if user_resp.status_code == 200 and repos_resp.status_code == 200:
-            repos_data = repos_resp.json()
-            repo_names = [repo["name"] for repo in repos_data]
-            languages = list(set([repo["language"] for repo in repos_data if repo["language"]]))
+        repos_data = repos_resp.json()
+        repo_names = [repo["name"] for repo in repos_data]
+        languages = list(set([repo["language"] for repo in repos_data if repo["language"]]))
 
-            real_data = {
-                "recent_repos": repo_names,
-                "primary_languages": languages,
-                "public_repos_count": user_resp.json().get("public_repos", 0)
-            }
-            return {"github_data": real_data}
-        else:
-            return {"github_data": {"error": f"API Error: User {username} not found."}}
-
+        real_data = {
+            "recent_repos": repo_names,
+            "primary_languages": languages,
+            "public_repos_count": user_resp.json().get("public_repos", 0)
+        }
+        return {"github_data": real_data}
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            return {"github_data": {"error": f"API Error: GitHub user '{username}' not found."}}
+        return {"github_d ata": {"error": f"API Error: {e.response.status_code} - {e.response.reason}"}}
     except Exception as e:
         return {"github_data": {"error": str(e)}}
 
 def code_mentor_review(state: ReviewState):
     username = state["username"]
     data = state["github_data"]
+
+    if data.get("error"):
+        return {"feedback": f"Could not provide a review for {username}. Reason: {data['error']}"}
 
     prompt = f"""
     You are an encouraging Code Mentor. Review this GitHub portfolio data for '{username}'.

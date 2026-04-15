@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 # We will create this graph in Phase 2
 from agent.graph import github_reviewer_app
 
